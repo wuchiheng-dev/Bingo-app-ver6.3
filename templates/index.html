@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bingo Bingo｜ver6.3.0 趨勢與線型分析</title>
+<style>
+:root{font-family:Arial,"Microsoft JhengHei",sans-serif;color:#202124;background:#f3f4f6}
+*{box-sizing:border-box}
+body{margin:0;padding:16px}
+.wrap{max-width:1280px;margin:auto}
+header,.panel{background:#fff;border-radius:12px;padding:18px;margin-bottom:14px;box-shadow:0 2px 8px #0000000d}
+h1{font-size:24px;margin:0 0 8px}
+h2{font-size:19px;margin:0 0 14px}
+.meta{color:#666;font-size:14px;line-height:1.8}
+.meta a{color:#1266cc}
+.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px}
+button{border:0;border-radius:9px;background:#1266cc;color:white;padding:11px 19px;font-size:15px;cursor:pointer}
+button:disabled{opacity:.55;cursor:wait}
+.status{font-size:14px;color:#555}
+.error{color:#b42318;background:#fff1f0;padding:12px;border-radius:8px;margin-top:12px;line-height:1.6;overflow-wrap:anywhere}
+.success{color:#067647;background:#ecfdf3;padding:10px;border-radius:8px;margin-top:10px;font-size:13px}
+.boards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:12px}
+.draw-card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:12px;min-width:0}
+.draw-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-weight:700;font-size:14px;margin-bottom:10px}
+.draw-date{font-weight:400;color:#777}
+.grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px}
+.ball{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#f0f1f3;color:#c7c9cd;font-weight:700;font-size:clamp(10px,1.3vw,14px);min-width:0}
+.ball.hit{background:#f52216;color:white}
+.ball.pred{background:#1677ff;color:#fff}
+.ball.hit.pred{background:#7b2cbf;color:white}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:#555;margin:8px 0 14px}
+.dot{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:middle;margin-right:5px}
+.pred-grid{max-width:640px}
+.pred-note{font-size:13px;color:#666;line-height:1.7;margin-top:12px;overflow-wrap:anywhere}
+.pred-chip{display:flex;align-items:center;justify-content:center;aspect-ratio:1;border-radius:50%;background:#1677ff;color:#fff;font-weight:700}
+.empty{color:#777;background:#f8f9fa;border:1px dashed #d0d5dd;border-radius:8px;padding:20px}
+.pattern-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px;margin-top:12px}
+.pattern-item{border:1px solid #e5e7eb;border-radius:9px;padding:11px;background:#fff}
+.pattern-item strong{font-size:14px}.pattern-item small{display:block;color:#667085;line-height:1.6;margin-top:5px}
+.pattern-ratio{font-weight:700;color:#b42318;margin-left:6px}
+@media(max-width:480px){body{padding:8px}header,.panel{padding:13px}h1{font-size:20px}.grid{gap:3px}.ball{font-size:11px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>🎯 Bingo Bingo｜近 10 期 10×8 開獎分布與線型趨勢</h1>
+<div class="meta">
+資料來源：<a href="https://www.taiwanlottery.com/lotto/result/bingo_bingo/" target="_blank" rel="noopener">台灣彩券官方網站</a>
+　｜　每期 01–80 號，開出 20 號
+</div>
+<div class="toolbar">
+<button id="refreshBtn" onclick="loadData(true)">立即更新</button>
+<span id="status" class="status">正在取得台灣彩券官方資料…</span>
+</div>
+<div id="error" aria-live="polite"></div>
+</header>
+
+<section class="panel">
+<h2>近 10 期開獎圖形（每期完整呈現 01–80）</h2>
+<div class="legend">
+<span><i class="dot" style="background:#f52216"></i>該期開出號碼</span>
+<span><i class="dot" style="background:#f0f1f3"></i>未開出號碼</span>
+<span><i class="dot" style="background:#1677ff"></i>預測候選 20 號碼</span>
+</div>
+<div id="boards" class="boards"><div class="empty">資料載入中…</div></div>
+</section>
+
+<section class="panel">
+<h2>依近 10 期頻率＋橫列／直行／斜線趨勢的候選 20 號碼</h2>
+<div id="prediction" class="grid pred-grid"></div>
+<div id="predtext" class="pred-note">必須成功取得並驗證完整10期資料後，才會計算候選號碼。</div>
+</section>
+
+<section class="panel">
+<h2>近 10 期線型趨勢分析</h2>
+<div class="meta">將 01–80 視為 8 橫列 × 10 直行，並檢查左斜／右斜線（至少連續4格）。比較近10期各線實際開出數與隨機基準，顯示相對活躍的線型。</div>
+<div id="patternSummary" class="pattern-list"><div class="empty">等待10期資料…</div></div>
+<div class="pred-note">重要提醒：每期開獎是獨立隨機事件。過去出現整排、整列或斜線，不代表下一期更容易沿線開出。此功能只描述歷史分布並調整候選號碼的選號結構，不能保證或證明提高中獎率。</div>
+</section>
+</div>
+
+<script>
+const pad = n => String(n).padStart(2, "0");
+
+function makeGrid(openSet, predSet = new Set()) {
+  let output = "";
+  for (let n = 1; n <= 80; n++) {
+    const isHit = openSet.has(n);
+    const isPred = predSet.has(n);
+    let cls = "ball";
+    if (isHit) cls += " hit";
+    if (isPred) cls += " pred";
+    output += `<div class="${cls}" title="${pad(n)}">${pad(n)}</div>`;
+  }
+  return output;
+}
+
+function showError(message) {
+  const box = document.getElementById("error");
+  box.textContent = "";
+  if (!message) return;
+  const div = document.createElement("div");
+  div.className = "error";
+  div.textContent = message;
+  box.appendChild(div);
+}
+
+function render(data) {
+  const draws = Array.isArray(data.draws) ? data.draws : [];
+  const predictions = Array.isArray(data.prediction) ? data.prediction : [];
+  const boards = document.getElementById("boards");
+
+  if (draws.length) {
+    boards.innerHTML = draws.map(draw => {
+      const openSet = new Set(draw.numbers || []);
+      return `<article class="draw-card">
+        <div class="draw-head">
+          <span>第 ${draw.term} 期</span>
+          <span class="draw-date">${draw.date || ""} ${draw.time || ""}</span>
+        </div>
+        <div class="grid">${makeGrid(openSet)}</div>
+      </article>`;
+    }).join("");
+  } else {
+    boards.innerHTML = '<div class="empty">目前沒有成功取得開獎資料，請查看上方錯誤訊息後重新更新。</div>';
+  }
+
+  const predictionBox = document.getElementById("prediction");
+  const predText = document.getElementById("predtext");
+  if (data.prediction_ready && predictions.length === 20) {
+    const predSet = new Set(predictions.map(item => item.number));
+    predictionBox.innerHTML = makeGrid(new Set(), predSet);
+    predText.textContent =
+      "統計樣本：最近10期。候選號碼：" +
+      predictions.map(item => pad(item.number)).join("、") +
+      "。近10期出現次數：" +
+      predictions.map(item => pad(item.number) + "（" + item.count + "次）").join("、") +
+      "。此為歷史頻率與近期權重排序，不代表下一期中獎機率較高。";
+  } else {
+    predictionBox.innerHTML = "";
+    predText.textContent = "目前未取得完整且通過驗證的10期資料，因此不產生預測候選號碼。";
+  }
+
+  const patternBox = document.getElementById("patternSummary");
+  const patternData = data.pattern_analysis || {};
+  const topPatterns = Array.isArray(patternData.top_patterns) ? patternData.top_patterns : [];
+  if (topPatterns.length) {
+    patternBox.innerHTML = topPatterns.slice(0, 8).map(item => {
+      const nums = (item.numbers || []).map(pad).join("、");
+      const ratio = Number(item.ratio || 0);
+      const ratioText = ratio >= 1 ? `基準的 ${ratio.toFixed(2)} 倍` : `基準的 ${ratio.toFixed(2)} 倍`;
+      return `<div class="pattern-item"><strong>${item.label}</strong><span class="pattern-ratio">${ratioText}</span><small>線長 ${item.length} 格｜近3期開出 ${item.recent3_hits} 顆</small><small>${nums}</small></div>`;
+    }).join("");
+  } else {
+    patternBox.innerHTML = '<div class="empty">目前沒有可分析的完整10期線型資料。</div>';
+  }
+
+  document.getElementById("status").textContent =
+    `取得 ${data.sample_size || draws.length} / 10 期｜更新時間：${data.updated_at || "--"}`;
+  showError(data.error || "");
+}
+
+async function loadData(force = false) {
+  const button = document.getElementById("refreshBtn");
+  button.disabled = true;
+  document.getElementById("status").textContent = "正在連線取得台灣彩券官方最近10期…";
+  showError("");
+
+  try {
+    const response = await fetch(force ? "/api/refresh" : "/api/data", {
+      method: force ? "POST" : "GET",
+      headers: { "Accept": "application/json" },
+      cache: "no-store"
+    });
+
+    // Read text first so an HTML error page is reported as HTTP/server error,
+    // not the confusing JavaScript SyntaxError: Unexpected token '<'.
+    const raw = await response.text();
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (_) {
+      throw new Error(
+        `伺服器回傳非 JSON 資料（HTTP ${response.status}）。` +
+        "請檢查 Render Logs；可能是後端例外或部署檔案不完整。"
+      );
+    }
+
+    if (!response.ok || !data.ok) {
+      render(data);
+      if (!data.error) showError(`伺服器回應 HTTP ${response.status}，目前無法取得完整資料。`);
+      return;
+    }
+    render(data);
+  } catch (error) {
+    document.getElementById("status").textContent = "連線失敗";
+    document.getElementById("boards").innerHTML =
+      '<div class="empty">尚無可顯示的開獎資料。</div>';
+    document.getElementById("prediction").innerHTML = "";
+    document.getElementById("predtext").textContent =
+      "未取得完整10期資料，暫不產生候選號碼。";
+    showError(error.message || String(error));
+  } finally {
+    button.disabled = false;
+  }
+}
+
+loadData(false);
+setInterval(() => loadData(false), 60000);
+</script>
+</body>
+</html>
